@@ -53,14 +53,14 @@ class Customer():
         self.parent = parent
         self.facility_list = []
 
-    def add_facility(self, facid):
-        self.facility_list.append(facid)
+    def add_facility(self, facility):
+        self.facility_list.append(facility)
         
     def ecl(self):
-        self.ecl = 0
+        ecl = 0
         for facility in self.facility_list:
-            self.ecl += facility.ecl()
-        return self.ecl
+            ecl += facility.ecl()
+        return ecl
     
 def return_customers(facid):
     tempcust = []
@@ -95,12 +95,14 @@ for i in data.index:
     facilities.append(facility)
     for j in range(len(customers)):
         if data['Customer ID'][i] == customers[j].customerid:
-            customers[j].add_facility(data['FacID'][i]) 
+            customers[j].add_facility(facility) 
 
-print(facilities[1].lgd)
-print(facilities[1].customer)
-print(facilities[1].limit)
-print(facilities[1].ead())
-print(facilities[1].customer.probdef)
-print(facilities[1].ecl())
-print(facilities[1].rwa())
+# print(facilities[1].lgd)
+# print(facilities[1].customer)
+# print(facilities[1].limit)
+# print(facilities[1].ead())
+# print(facilities[1].customer.probdef)
+# print(facilities[1].ecl())
+# print(facilities[1].rwa())
+
+print(customers[1].ecl())
