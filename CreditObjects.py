@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np 
 import matplotlib.pyplot as plt
 import seaborn as sns
-import datetime as dt
+from  datetime import datetime
+from scipy.stats import norm
 import torch
 
 class Facility():
@@ -21,6 +22,8 @@ class Facility():
         self.ifrs_stage = ifrs_stage
         self.customerid = customerid
         self.customer = customer
+        self.maturity = (maturity_date - datetime.now()).days / 365.25
+        self.effmaturity = max(min(self.maturity, 5), 1)
 
     def ead(self):
         if self.type == 'Loan':
@@ -35,8 +38,13 @@ class Facility():
         return ecl
     
     def risk_weight(self):
-        #insert risk weight calc here
-        risk_weight = 0.05
+        R = (0.12 * (1 - np.exp(-50*self.customer.probdef))/(1-np.exp(-50))) + (0.24 * (1-(1 - np.exp(-50*self.customer.probdef))/(1-np.exp(-50))))
+        b = (0.11852 - (0.05478 * np.log(self.customer.probdef)))**2
+        matadj = (1 + ((self.effmaturity  - 2.5) * b))/(1 - (1.5 * b))
+        temp = norm.ppf(self.customer.probdef)/np.sqrt(1-R)+np.sqrt(R/(1-R))*norm.ppf(0.999) 
+        K = (self.lgd * norm.cdf(norm.ppf(self.customer.probdef)/np.sqrt(1-R)+np.sqrt(R/(1-R))*norm.ppf(0.999)) 
+             - (self.lgd * self.customer.probdef)) * matadj
+        risk_weight = K * 12.5
         return risk_weight
     
     def rwa(self):
@@ -104,5 +112,9 @@ for i in data.index:
 # print(facilities[1].customer.probdef)
 # print(facilities[1].ecl())
 # print(facilities[1].rwa())
+# print(facilities[1].maturity)
+# print(facilities[1].effmaturity)
+# print(facilities[0].risk_weight())
+# print(facilities[1].rwa())
 
-print(customers[1].ecl())
+# print(customers[1].ecl())
