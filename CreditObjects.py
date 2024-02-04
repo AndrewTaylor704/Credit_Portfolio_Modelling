@@ -2,13 +2,13 @@ import pandas as pd
 import numpy as np 
 import matplotlib.pyplot as plt
 import seaborn as sns
-from  datetime import datetime
+import datetime as dt
 from scipy.stats import norm
 import torch
 
 class Facility():
     def __init__(self, facid, lgd, type, start_date, maturity_date, limit, drawn_balance, margin, fee, 
-                 currency, ifrs_stage, customerid, customer):
+                 currency, ifrs_stage, customerid, customer, frequency = 'quarterly'):
         self.facid = facid
         self.lgd = lgd
         self.type = type
@@ -22,8 +22,44 @@ class Facility():
         self.ifrs_stage = ifrs_stage
         self.customerid = customerid
         self.customer = customer
-        self.maturity = (maturity_date - datetime.now()).days / 365.25
+        self.maturity = (maturity_date - dt.datetime.now()).days / 365.25
         self.effmaturity = max(min(self.maturity, 5), 1)
+        self.frequency = frequency
+        self.amort_profile = []
+
+    def calc_amort_profile(self):
+        #Straight line amortisation profiles only at the moment, need to expand to mortgage style and bullets
+        self.amort_profile = []
+        if self.frequency == 'quarterly':
+            payments_per_year = 4.0
+        elif self.frequency == 'monthly':
+            payments_per_year = 12.0
+        elif self.frequency == 'annual':
+            payments_per_year = 1.0
+        else:
+            raise ValueError('Incorrect payment frequency type')
+        
+        remaining_payments = np.ceil(self.maturity * payments_per_year)
+        payment_amount = self.drawn_balance / remaining_payments
+
+        for i in range(int(remaining_payments),0 , -1):
+            j = int(remaining_payments) - i
+            self.amort_profile.insert(0, (self.maturity_date - (j * dt.timedelta(days = 365.25/payments_per_year)), j * payment_amount))
+        return self.amort_profile
+    
+    def balance_on_date(self, future_date):
+        self.calc_amort_profile()
+        future_date = pd.to_datetime(future_date)
+        dates_list = [list(t) for t in zip(*self.amort_profile)][0]
+        idx = 0
+        if future_date > self.maturity_date:
+            idx = len(self.amort_profile)
+        elif future_date <= dt.datetime.now():
+            idx = 1
+        else:
+            while future_date > dates_list[idx]:
+                idx += 1
+        return self.amort_profile[idx-1][1]
 
     def ead(self):
         if self.type == 'Loan':
@@ -37,17 +73,21 @@ class Facility():
         ecl = ecl
         return ecl
     
-    def risk_weight(self):
+    def calc_risk_weight(self, pd, lgd, maturity, turnover):
         # Note this just does the Corporate RWA calc today - needs expanding to cover Retail
-        R = (0.12 * (1 - np.exp(-50*self.customer.probdef))/(1-np.exp(-50))) + (0.24 * (1-(1 - np.exp(-50*self.customer.probdef))/(1-np.exp(-50))))
-        if self.customer.turnover <= 50:
-            R += -0.04 * (1 - ((max(self.customer.turnover, 5) - 5) / 45))
-        b = (0.11852 - (0.05478 * np.log(self.customer.probdef)))**2
-        matadj = (1 + ((self.effmaturity  - 2.5) * b))/(1 - (1.5 * b))
-        temp = norm.ppf(self.customer.probdef)/np.sqrt(1-R)+np.sqrt(R/(1-R))*norm.ppf(0.999) 
-        K = (self.lgd * norm.cdf(norm.ppf(self.customer.probdef)/np.sqrt(1-R)+np.sqrt(R/(1-R))*norm.ppf(0.999)) 
-             - (self.lgd * self.customer.probdef)) * matadj
-        risk_weight = K * 12.5
+        effmat = max(min(self.maturity, 5), 1)
+        R = (0.12 * (1 - np.exp(-50*pd))/(1-np.exp(-50))) + (0.24 * (1-(1 - np.exp(-50*pd))/(1-np.exp(-50))))
+        if turnover <= 50:
+            R += -0.04 * (1 - ((max(turnover, 5) - 5) / 45))
+        b = (0.11852 - (0.05478 * np.log(pd)))**2
+        matadj = (1 + ((effmat - 2.5) * b))/(1 - (1.5 * b))
+        K = (lgd * norm.cdf(norm.ppf(pd)/np.sqrt(1-R)+np.sqrt(R/(1-R))*norm.ppf(0.999)) 
+             - (lgd * pd)) * matadj
+        calc_risk_weight = K * 12.5
+        return calc_risk_weight
+
+    def risk_weight(self):
+        risk_weight = self.calc_risk_weight(self.customer.probdef, self.lgd, self.maturity, self.customer.turnover)
         return risk_weight
     
     def rwa(self):
@@ -120,6 +160,8 @@ for i in data.index:
 # print(facilities[1].rwa())
 # print(facilities[1].maturity)
 # print(facilities[1].effmaturity)
-print(facilities[0].risk_weight())
+# print(facilities[0].risk_weight())
 # print(facilities[6].rwa())
 # print(customers[1].ecl())
+# print(facilities[0].calc_amort_profile())            
+# print(facilities[0].balance_on_date('2025-03-29'))
