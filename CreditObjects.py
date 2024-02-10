@@ -25,7 +25,11 @@ class Facility():
         self.maturity = (maturity_date - dt.datetime.now()).days / 365.25
         self.effmaturity = max(min(self.maturity, 5), 1)
         self.frequency = frequency
-        self.amort_profile = []
+        self.ead = self.ead()
+        self.ecl = self.ecl()
+        self.risk_weight = self.risk_weight()
+        self.rwa = self.rwa()
+        self.calc_amort_profile()
 
     def calc_amort_profile(self):
         #Straight line amortisation profiles only at the moment, need to expand to mortgage style and bullets
@@ -69,8 +73,7 @@ class Facility():
         return ead
 
     def ecl(self):
-        ecl = self.lgd * self.ead() * self.customer.probdef
-        ecl = ecl
+        ecl = self.lgd * self.ead * self.customer.probdef
         return ecl
     
     def calc_risk_weight(self, pd, lgd, maturity, turnover):
@@ -91,7 +94,7 @@ class Facility():
         return risk_weight
     
     def rwa(self):
-        rwa = self.ead() * self.risk_weight()
+        rwa = self.ead * self.risk_weight
         return rwa 
     
 class Customer():
@@ -111,9 +114,31 @@ class Customer():
     def ecl(self):
         ecl = 0
         for facility in self.facility_list:
-            ecl += facility.ecl()
+            ecl += facility.ecl
         return ecl
     
+    def rwa(self):
+        rwa = 0
+        for facility in self.facility_list:
+            rwa += facility.rwa
+        return rwa
+
+    def ead(self):
+        ead = 0
+        for facility in self.facility_list:
+            ead += facility.ead
+        return ead
+    
+    def risk_weight(self):
+        risk_weight = self.rwa() / self.ead()
+        return risk_weight
+
+    def balance_on_date(self, future_date):
+        balance = 0
+        for facility in self.facility_list:
+            balance += facility.balance_on_date(future_date)
+        return balance
+        
 def return_customers(facid):
     tempcust = []
     for i in range(len(customers)):
@@ -149,19 +174,21 @@ for i in data.index:
     facilities.append(facility)
     for j in range(len(customers)):
         if data['Customer ID'][i] == customers[j].customerid:
-            customers[j].add_facility(facility) 
+            customers[j].add_facility(facility)
 
 # print(facilities[1].lgd)
 # print(facilities[1].customer)
 # print(facilities[1].limit)
-# print(facilities[1].ead())
+# print(facilities[1].ead)
 # print(facilities[1].customer.probdef)
-# print(facilities[1].ecl())
-# print(facilities[1].rwa())
+# print(facilities[1].ecl)
+# print(facilities[1].rwa)
 # print(facilities[1].maturity)
 # print(facilities[1].effmaturity)
-# print(facilities[0].risk_weight())
-# print(facilities[6].rwa())
-# print(customers[1].ecl())
+# print(facilities[0].risk_weight)
+# print(facilities[6].rwa)
+# print(customers[0].rwa())
+# print(customers[0].ead())
 # print(facilities[0].calc_amort_profile())            
-# print(facilities[0].balance_on_date('2025-03-29'))
+# print(customers[0].balance_on_date('2025-03-29'))
+
