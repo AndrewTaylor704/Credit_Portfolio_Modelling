@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime as dt
 from scipy.stats import norm
-import torch
 
 class Facility():
     def __init__(self, facid, lgd, type, start_date, maturity_date, limit, drawn_balance, margin, fee, 
@@ -46,8 +45,8 @@ class Facility():
         remaining_payments = np.ceil(self.maturity * payments_per_year)
         payment_amount = self.drawn_balance / remaining_payments
 
-        for i in range(int(remaining_payments),0 , -1):
-            j = int(remaining_payments) - i
+        for i in range(int(remaining_payments + 1),0 , -1):
+            j = int(remaining_payments) - i + 1
             self.amort_profile.insert(0, (self.maturity_date - (j * dt.timedelta(days = 365.25/payments_per_year)), j * payment_amount))
         return self.amort_profile
     
@@ -138,6 +137,43 @@ class Customer():
         for facility in self.facility_list:
             balance += facility.balance_on_date(future_date)
         return balance
+
+class Portfolio():
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+        self.customer_list = []
+
+    def add_customer(self, customer):
+        self.customer_list.append(customer)
+
+    def ecl(self):
+        ecl = 0
+        for customer in self.customer_list:
+            ecl += customer.ecl()
+        return ecl
+    
+    def rwa(self):
+        rwa = 0
+        for customer in self.customer_list:
+            rwa += customer.rwa()
+        return rwa
+
+    def ead(self):
+        ead = 0
+        for customer in self.customer_list:
+            ead += customer.ead
+        return ead
+    
+    def risk_weight(self):
+        risk_weight = self.rwa() / self.ead()
+        return risk_weight
+
+    def balance_on_date(self, future_date):
+        balance = 0
+        for customer in self.customer_list:
+            balance += customer.balance_on_date(future_date)
+        return balance
         
 def return_customers(facid):
     tempcust = []
@@ -176,6 +212,11 @@ for i in data.index:
         if data['Customer ID'][i] == customers[j].customerid:
             customers[j].add_facility(facility)
 
+portfolio = Portfolio('10001', 'Dummy portfolio')
+
+for i, x in enumerate(customers):
+    portfolio.add_customer(x)
+
 # print(facilities[1].lgd)
 # print(facilities[1].customer)
 # print(facilities[1].limit)
@@ -187,8 +228,8 @@ for i in data.index:
 # print(facilities[1].effmaturity)
 # print(facilities[0].risk_weight)
 # print(facilities[6].rwa)
-# print(customers[0].rwa())
+# print(portfolio.ecl())
 # print(customers[0].ead())
-# print(facilities[0].calc_amort_profile())            
-# print(customers[0].balance_on_date('2025-03-29'))
-
+# print(facilities[6].calc_amort_profile())            
+# print(portfolio.rwa())
+# print(portfolio.customer_list)
