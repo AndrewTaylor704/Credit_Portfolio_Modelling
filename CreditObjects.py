@@ -138,14 +138,22 @@ class Customer():
             balance += facility.balance_on_date(future_date)
         return balance
 
+    def calc_losses(self, future_date):
+        losses = 0
+        for facility in self.facility_list:
+            losses += facility.balance_on_date(future_date) * facility.lgd
+        return losses
+
 class Portfolio():
     def __init__(self, id, name):
         self.id = id
         self.name = name
         self.customer_list = []
+        self.num_customers = 0
 
     def add_customer(self, customer):
         self.customer_list.append(customer)
+        self.num_customers += 1
 
     def ecl(self):
         ecl = 0
@@ -174,7 +182,61 @@ class Portfolio():
         for customer in self.customer_list:
             balance += customer.balance_on_date(future_date)
         return balance
-        
+
+    def simulate_loss_distribution(self, correlation, num_sims, num_bins, horizon = 1, random_seed = 1234):
+        threshold_value = np.zeros(self.num_customers)
+        counter = 0
+        rng = np.random.default_rng(seed = random_seed)
+        potential_loss = np.zeros(self.num_customers)
+        loss_dist = np.zeros((num_bins,2))
+        total_notional = 0
+        for customer in self.customer_list:
+            threshold_value[counter] = norm.ppf(customer.probdef)
+            potential_loss[counter] = customer.calc_losses(dt.timedelta(horizon * 365.25) + dt.datetime.now())
+            total_notional += potential_loss[counter]
+            counter += 1
+
+        binsize = total_notional / num_bins
+
+        for i in range(0, num_sims):
+            if i // 1000 == i / 1000:
+                print(f"Simulation # {i}")
+            sim_loss = 0
+            bin_loss = 0
+            default_marker = np.zeros(self.num_customers)
+            syst_rand = rng.standard_normal()
+            idio_rand = rng.standard_normal(self.num_customers)
+            cust_asset_value = np.sqrt(correlation) * syst_rand + np.sqrt(1-correlation) * idio_rand
+
+            for k in range(0, self.num_customers):
+                if cust_asset_value[k] < threshold_value[k]:
+                    default_marker[k] = True
+                else:
+                    default_marker[k] = False
+
+            sim_loss = np.sum(default_marker * potential_loss)
+            bin_loss = sim_loss / total_notional * num_bins
+            
+            j = 0
+            while j <= bin_loss:
+                loss_dist[j,0] += 1
+                j += 1
+        loss_dist = loss_dist / num_sims
+        for i in range(0, num_bins):
+            loss_dist[i, 1] = binsize * i
+
+        self.loss_dist = loss_dist
+
+    def plot_loss_dist(self):
+        plt.plot(self.loss_dist[:,1], self.loss_dist[:,0])
+        plt.show()
+
+    def loss_dist_quantile(self, confidence):
+        for i in range(0, self.loss_dist.shape[0]-1):
+            if self.loss_dist[i,0] > 1 - confidence > self.loss_dist[i+1, 0]:
+                return self.loss_dist[i,1]
+        return False
+
 def return_customers(facid):
     tempcust = []
     for i in range(len(customers)):
@@ -233,3 +295,9 @@ for i, x in enumerate(customers):
 # print(facilities[6].calc_amort_profile())            
 # print(portfolio.rwa())
 # print(portfolio.customer_list)
+
+# print(portfolio.simulate_loss_distribution(0.25, 10000, 1000))
+# portfolio.plot_loss_dist()
+# print(portfolio.loss_dist_quantile(0.999))
+# print(portfolio.loss_dist_quantile(0.99))
+# print(portfolio.loss_dist_quantile(0.95))
