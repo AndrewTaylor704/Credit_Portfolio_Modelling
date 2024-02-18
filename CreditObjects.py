@@ -183,6 +183,12 @@ class Portfolio():
             balance += customer.balance_on_date(future_date)
         return balance
 
+    def calc_losses(self, future_date):
+        losses = 0
+        for customer in self.customer_list:
+            losses += customer.calc_losses(future_date)
+        return losses
+
     def simulate_loss_distribution(self, correlation, num_sims, num_bins, horizon = 1, random_seed = 1234):
         threshold_value = np.zeros(self.num_customers)
         counter = 0
@@ -192,14 +198,14 @@ class Portfolio():
         total_notional = 0
         for customer in self.customer_list:
             threshold_value[counter] = norm.ppf(customer.probdef)
-            potential_loss[counter] = customer.calc_losses(dt.timedelta(horizon * 365.25) + dt.datetime.now())
+            potential_loss[counter] = customer.calc_losses(dt.timedelta(days = horizon * 365.25) + dt.datetime.now())
             total_notional += potential_loss[counter]
             counter += 1
 
         binsize = total_notional / num_bins
 
         for i in range(0, num_sims):
-            if i // 1000 == i / 1000:
+            if i // np.ceil(num_sims/10) == i / np.ceil(num_sims/10):
                 print(f"Simulation # {i}")
             sim_loss = 0
             bin_loss = 0
@@ -215,7 +221,7 @@ class Portfolio():
                     default_marker[k] = False
 
             sim_loss = np.sum(default_marker * potential_loss)
-            bin_loss = sim_loss / total_notional * num_bins
+            bin_loss = min(sim_loss / total_notional * num_bins, num_bins-1)
             
             j = 0
             while j <= bin_loss:
@@ -293,11 +299,14 @@ for i, x in enumerate(customers):
 # print(portfolio.ecl())
 # print(customers[0].ead())
 # print(facilities[6].calc_amort_profile())            
-# print(portfolio.rwa())
+# print(f'rwa = {portfolio.rwa():.4f}')
 # print(portfolio.customer_list)
 
-# print(portfolio.simulate_loss_distribution(0.25, 10000, 1000))
-# portfolio.plot_loss_dist()
-# print(portfolio.loss_dist_quantile(0.999))
+print(portfolio.balance_on_date(dt.timedelta(days = 365.25) + dt.datetime.now()))
+print(portfolio.calc_losses(dt.timedelta(days = 365.25) + dt.datetime.now()))
+portfolio.simulate_loss_distribution(0.15, 10000, 1000)
+portfolio.plot_loss_dist()
+print(portfolio.loss_dist_quantile(0.999))
+print(portfolio.loss_dist)
 # print(portfolio.loss_dist_quantile(0.99))
 # print(portfolio.loss_dist_quantile(0.95))
