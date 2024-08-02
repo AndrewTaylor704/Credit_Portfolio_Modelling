@@ -7,7 +7,7 @@ from scipy.stats import norm
 
 class Facility():
     def __init__(self, facid, lgd, type, start_date, maturity_date, limit, drawn_balance, margin, fee, 
-                 currency, ifrs_stage, customerid, customer, frequency = 'quarterly'):
+                    currency, ifrs_stage, customerid, customer, frequency = 'quarterly'):
         self.facid = facid
         self.lgd = lgd
         self.type = type
@@ -205,8 +205,8 @@ class Portfolio():
         binsize = total_notional / num_bins
 
         for i in range(0, num_sims):
-            if i // np.ceil(num_sims/10) == i / np.ceil(num_sims/10):
-                print(f"Simulation # {i}")
+            if (i+1) // np.ceil(num_sims/10) == (i+1) / np.ceil(num_sims/10):
+                print(f"Simulation # {i+1}")
             sim_loss = 0
             bin_loss = 0
             default_marker = np.zeros(self.num_customers)
@@ -235,6 +235,10 @@ class Portfolio():
 
     def plot_loss_dist(self):
         plt.plot(self.loss_dist[:,1], self.loss_dist[:,0])
+        plt.xlabel('Loss amount')
+        plt.ylabel('Probability')
+        plt.title('MC Simulation of Portfolio Loss Distribution')
+        plt.xlim(0, np.max(self.loss_dist[:,1])/5)
         plt.show()
 
     def loss_dist_quantile(self, confidence):
@@ -299,14 +303,15 @@ for i, x in enumerate(customers):
 # print(portfolio.ecl())
 # print(customers[0].ead())
 # print(facilities[6].calc_amort_profile())            
-# print(f'rwa = {portfolio.rwa():.4f}')
+print(f'rwa = {portfolio.rwa():.2f}')
+print(f'UL = {portfolio.rwa() / 12.5:.2f}')
 # print(portfolio.customer_list)
 
-print(portfolio.balance_on_date(dt.timedelta(days = 365.25) + dt.datetime.now()))
-print(portfolio.calc_losses(dt.timedelta(days = 365.25) + dt.datetime.now()))
-portfolio.simulate_loss_distribution(0.15, 10000, 1000)
-portfolio.plot_loss_dist()
+# print(portfolio.balance_on_date(dt.timedelta(days = 365.25) + dt.datetime.now()))
+# print(portfolio.calc_losses(dt.timedelta(days = 365.25) + dt.datetime.now()))
+portfolio.simulate_loss_distribution(0.15, 100000, 10000)
 print(portfolio.loss_dist_quantile(0.999))
-print(portfolio.loss_dist)
+portfolio.plot_loss_dist()
+# print(portfolio.loss_dist)
 # print(portfolio.loss_dist_quantile(0.99))
 # print(portfolio.loss_dist_quantile(0.95))
